@@ -6,6 +6,8 @@ from threading import Timer
 import serial.tools.list_ports
 
 ser = ''
+serBuffer = ''
+backgroundColour = '#3C3C3C'
 
 def serial_ports():                                             # Find available com ports
     ports = serial.tools.list_ports.comports()
@@ -15,6 +17,10 @@ def serial_ports():                                             # Find available
 
     return available_ports
 
+def updateComPortlist():
+    list = serial_ports()
+    cb['values'] = list
+
 def on_select(event=None):                                      # When com port is selected, connect to com port
     global ser
     serialPortSelect = cb.get()
@@ -22,7 +28,7 @@ def on_select(event=None):                                      # When com port 
     ser = Serial(serialPortSelect , baudRate, timeout=0, writeTimeout=0) #ensure non-blocking
     readSerial()
 
-def sendButtonCommand():
+def buttonSendCommand():
     temp='T1'                                                   # Change temp to what value you want the button to send
     sendSerial(temp)
 
@@ -42,8 +48,6 @@ def func(event):                                                # When 'enter' p
     t = Timer(0.5, clearAll)                                    # Clears text after 0.5 seconds
     t.start()
 
-backgroundColour = '#3C3C3C'
-
 mainWindow = tk.Tk()
 mainWindow.title('Serial Comms')
 mainWindow.configure(height='600', width='800')
@@ -53,12 +57,12 @@ frame_1.place(anchor='nw', x='0', y='0')
 lbl1 = tk.Label(mainWindow, text='Serial Port')
 lbl1.configure(bg=backgroundColour, fg='White')
 lbl1.place(anchor='nw', x='30', y='10')
-cb = ttk.Combobox(frame_1, values=serial_ports())
+cb = ttk.Combobox(frame_1, postcommand=updateComPortlist)
 cb.place(anchor='nw', height='26', width='200', x='30', y='40')
 buttonComm = tk.Button(frame_1)
 buttonComm.configure(text='Send\nCommand')
 buttonComm.place(anchor='nw', height='60', width='100', x='30', y='120')
-buttonComm.configure(command=sendButtonCommand)
+buttonComm.configure(command=buttonSendCommand)
 lbl2 = tk.Label(mainWindow, text='Serial Send:')
 lbl2.configure(bg=backgroundColour, fg='White')
 lbl2.place(anchor='nw', x='30', y='220')
@@ -72,8 +76,6 @@ textOUTPUT = tk.Text(frame_1)
 textOUTPUT.configure(height='18', width='105')
 textOUTPUT.place(anchor='nw', x='30', y='330')
 
-serBuffer = ''
-
 def readSerial():
     global ser
     global serBuffer
@@ -83,22 +85,25 @@ def readSerial():
         while True:
             c = ser.read()
 
-            if len(c) == 0:                                     # Was anything read?
+            if len(c) == 0:
                 break
 
-            if (c == b'\xb0'):                                  # Remove characters that cause error
+            if (c == b'\xb0'):                                  # Change / remove characters that cause error
                 c = '°'
             elif (c == b'\xb2'):
                 c = '²'
-            elif (c == b'\xba') or (c == b'\xc2') or (c == '\r'):
+            elif (c == b'\xba') or (c == b'\xc2'):
                 c = ''
             else:
-                c = c.decode('ascii')
-            
+                c = c.decode('ascii') 
+
+            if c == '\r':                                       # check if character is a delimeter
+                c = ''                                          # don't want returns. chuck it
+                
             if c == '\n':
                 serBuffer += '\n'                               # add the newline to the buffer
-                textOUTPUT.insert(END, serBuffer)               # Add to the end
-                textOUTPUT.see(END)                             # See end of text (auto scroll)
+                textOUTPUT.insert(END, serBuffer)               #add the line to the TOP of the log
+                textOUTPUT.see(END)
                 serBuffer = ''                                  # empty the buffer
             else:
                 serBuffer += c                                  # add to the buffer
